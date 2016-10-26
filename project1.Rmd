@@ -1,0 +1,131 @@
+---
+title: "MA615 Project1"
+author: "Chenyang Yu"
+date: "October 26, 2016"
+output: ioslides_presentation
+---
+
+## To beigin with,
+
+- Tidy Data
+- 3 studies
+
+
+## Tidy Data
+```{r}
+ogc <-  read.csv("oilgascounty.csv")
+ogc <- data.frame(ogc, stringsAsFactors = FALSE)
+dim(ogc)
+a <- which(colnames(ogc)== "gas2000")
+b <- which(colnames(ogc)== "oil_change_group")
+library(dplyr)
+library(tidyr)
+```
+
+## Columns & Rename
+```{r}
+#drop the columns that not needed
+oc <- ogc[,c(1:(a-1),(b):(b))]
+#rename
+names(oc)[4] <- "county"
+names(oc)[5] <- "rucc"
+names(oc)[6] <- "ui"
+names(oc)[7] <- "mn"
+names(oc)[8] <- "mmn"
+#drop county column
+oc<- select(oc, FIPS:Stabr, rucc:oil_change_group)
+#add new colum of row sum of total oil in oc
+oc$sum <- rowSums( oc[,8:19] )
+```
+
+##new subset on oil2000-oil2011 to explore
+```{r}
+#create a new subset on oil in order to see patterns and to explore potential correlations
+oilyears<- select(oc, oil2000:oil2011)
+summarise_each(oilyears, funs(mean))
+#mean of each row in oilyears
+oilyears$means <- apply(oilyears, 1, mean)
+#mean of each column in oilyears
+apply(oilyears, 2, mean)
+#will use nonzero and oc for analyzing
+```
+
+## Summaries on States
+```{r, echo=FALSE}
+#find out which state to study
+summary(oc$Stabr)
+```
+
+## Reorganize data and more summaries
+```{r, echo=FALSE}
+#filter data and create Texas subset
+TX <- filter(oc,oc$Stabr == 'TX' )
+TX$ave <- TX$sum/12
+#summary on each variable
+summary(TX, measurevar="ave", groupvars=c("geoid","mn"))
+library(ggplot2)
+```
+
+## 1.Studies on FIPS and ave
+```{r, echo=FALSE}
+#regression between FIPS and ave
+ggplot(TX, aes(FIPS, ave))+geom_point(color="firebrick") + geom_smooth(method = lm)+ ggtitle("FIPS vs. ave in TX")
+summary(lm(formula = ave ~ FIPS, data = TX))
+```
+
+## More Studies on FIPS and ave
+```{r, echo=FALSE}
+#clean out ave=0 data points
+TXnonzero <- filter(TX, ave!=0)
+#regression between FIPS and ave in TXnonzero, to see if O variables affect the regreesion line
+ggplot(TXnonzero, aes(FIPS, ave))+geom_point(color="firebrick") + geom_smooth(method = lm) + ggtitle("FIPS vs. ave in TXnonzero")
+model1 <-lm(formula = ave ~ FIPS, data = TXnonzero)
+summary(model1)
+```
+
+## 2.Studies on oil2000 and oil2011
+```{r, echo=FALSE}
+#regression for oil2000 and oil2011
+ggplot(TXnonzero, aes(x=oil2000, y=oil2011, group=oil_change_group)) +
+  geom_line(aes(linetype=oil_change_group,color=oil_change_group))+
+  geom_point(aes(shape=oil_change_group, color = oil_change_group))
+```
+
+## Build a model 
+```{r, echo=FALSE}
+model2 <-lm(formula = oil2000 ~ oil2011, data = TXnonzero)
+summary(model2)
+```
+
+## Residual vs Fitted Plot
+```{r, echo=FALSE}
+g<- ggplot(model2, aes(.fitted, .resid))+geom_point()
+g +geom_smooth(method="loess")+geom_hline(yintercept=0,col="red", linetype="dashed")+xlab("Fitted values")+ylab("Residuals")+ ggtitle("oil2000 and oil2011 Residual vs Fitted Plot")
+```
+
+## Normal Q-Q
+```{r, echo=FALSE}
+ggplot(model2, aes(qqnorm(.stdresid)[[1]], .stdresid))+geom_point() + xlab("Theoretical Quantiles")+ ylab("Standardized Residuals")+ggtitle("oil2000 and oil2011 Normal Q-Q")
+```
+
+## 3. Studies on oil_change_group
+```{r, echo=FALSE}
+#histogram for TX$oil_change_group 
+ggplot(TX, aes(oil_change_group))+ geom_bar(fill = "black", color ="black") +theme_minimal() +ggtitle("histogram for oil_change_group")
+```
+
+## Boxplot
+```{r, echo=FALSE}
+#box plot for oil_change_group
+ggplot(TX, aes(x = oil_change_group, y = ave))+geom_boxplot()+ geom_boxplot(aes(fill = oil_change_group))+ ggtitle("oil_change_group vs. ave in TX")
+```
+
+## Density Plot
+```{r, echo=FALSE}
+#density plot for axe, color by oil_change_group
+ggplot(TX, aes(x = ave)) + geom_density(aes(color = oil_change_group)) + ggtitle("ave density plot in TX")
+```
+
+## The End. 
+
+Thank you!
